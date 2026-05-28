@@ -1,0 +1,13 @@
+node:internal/dns/promises:294
+    this.reject(new DNSException(err, this.bindingName, this.hostname));
+                ^
+
+Error: querySrv ECONNREFUSED _mongodb._tcp.cluster.mongodb.net
+    at QueryReqWrap.onresolve [as oncomplete] (node:internal/dns/promises:294:17) {
+  errno: undefined,
+  code: 'ECONNREFUSED',
+  syscall: 'querySrv',
+  hostname: '_mongodb._tcp.cluster.mongodb.net'
+}
+
+Node.js v24.15.0
