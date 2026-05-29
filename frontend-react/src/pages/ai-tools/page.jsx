@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { addDownloadHistory, addRecentFile } from "@/lib/history";
 import { useToast } from "@/hooks/use-toast";
-import { Download, Sparkles } from "lucide-react";
+import JSZip from "jszip";
+import { Download, Sparkles, Trash2 } from "lucide-react";
 
 const loadImage = (file) => new Promise((resolve, reject) => {
     const image = new Image();
@@ -181,75 +182,155 @@ const tools = [
 
 export default function AiToolsPage() {
     const { toast } = useToast();
-    const [file, setFile] = useState(null);
-    const [previewUrl, setPreviewUrl] = useState(null);
-    const [resultUrl, setResultUrl] = useState(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const [items, setItems] = useState([]);
+    const [isBatchLoading, setIsBatchLoading] = useState(false);
     const [activeTool, setActiveTool] = useState(null);
-    const [target, setTarget] = useState({ x: 0.5, y: 0.5 });
     const [error, setError] = useState("");
+    const itemsRef = useRef(items);
 
     useEffect(() => {
-        if (!file) {
-            setPreviewUrl(null);
-            setResultUrl(null);
-            return undefined;
-        }
-        const url = URL.createObjectURL(file);
-        setPreviewUrl(url);
-        setResultUrl(null);
-        addRecentFile({
-            id: `${file.name}-${file.size}`,
-            name: file.name,
-            type: "image",
-            time: new Date().toISOString(),
-            source: "ai-tools",
-        });
-        return () => URL.revokeObjectURL(url);
-    }, [file]);
+        itemsRef.current = items;
+    }, [items]);
 
-    const handleAction = async (tool) => {
-        if (!file)
+    useEffect(() => () => {
+        itemsRef.current.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+    }, []);
+
+    const buildItem = (file) => ({
+        id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        resultUrl: null,
+        isLoading: false,
+        activeTool: null,
+        error: "",
+        target: { x: 0.5, y: 0.5 },
+    });
+
+    const handleFiles = (fileList) => {
+        const selected = Array.from(fileList || []).filter((file) => file.type.startsWith("image/"));
+        if (!selected.length) {
+            setError("Please select image files only.");
+            return;
+        }
+        setError("");
+        const newItems = selected.map(buildItem);
+        setItems((prev) => [...newItems, ...prev]);
+        newItems.forEach((item) => {
+            addRecentFile({
+                id: `${item.file.name}-${item.file.size}`,
+                name: item.file.name,
+                type: "image",
+                time: new Date().toISOString(),
+                source: "ai-tools",
+            });
+        });
+    };
+
+    const updateItem = (id, updater) => {
+        setItems((prev) => prev.map((item) => (item.id === id ? updater(item) : item)));
+    };
+
+    const getSafeBaseName = (name) => name.replace(/\.[^/.]+$/, "").replace(/\s+/g, "-");
+
+    const getResultExtension = (dataUrl) => (dataUrl?.startsWith("data:image/png") ? "png" : "jpg");
+
+    const handleAction = async (itemId, tool) => {
+        const current = itemsRef.current.find((item) => item.id === itemId);
+        if (!current)
             return;
         setError("");
         setActiveTool(tool);
-        setIsLoading(true);
+        updateItem(itemId, (item) => ({ ...item, isLoading: true, activeTool: tool, error: "" }));
         try {
-            setResultUrl(await runTool(file, tool, target));
-            toast({ title: "AI tool applied", description: `${tools.find((item) => item.id === tool)?.label || "Tool"} result is ready.` });
+            const result = await runTool(current.file, tool, current.target);
+            updateItem(itemId, (item) => ({ ...item, resultUrl: result, isLoading: false }));
+            toast({ title: "AI tool applied", description: `${tools.find((entry) => entry.id === tool)?.label || "Tool"} ready for ${current.file.name}.` });
         }
         catch {
-            setError("Image process failed. Try another image.");
+            updateItem(itemId, (item) => ({ ...item, isLoading: false, error: "Image process failed." }));
             toast({ title: "AI tool failed", description: "Try another image or a smaller file.", variant: "destructive" });
         }
-        finally {
-            setIsLoading(false);
-        }
     };
 
-    const handleTarget = (event) => {
+    const handleApplyAll = async (tool) => {
+        const eligible = itemsRef.current.filter((item) => !item.isLoading);
+        if (!eligible.length)
+            return;
+        setIsBatchLoading(true);
+        setActiveTool(tool);
+        setError("");
+        for (const item of eligible) {
+            // eslint-disable-next-line no-await-in-loop
+            await handleAction(item.id, tool);
+        }
+        setIsBatchLoading(false);
+    };
+
+    const handleTarget = (itemId, event) => {
         const rect = event.currentTarget.getBoundingClientRect();
-        setTarget({
+        const nextTarget = {
             x: (event.clientX - rect.left) / rect.width,
             y: (event.clientY - rect.top) / rect.height,
-        });
+        };
+        updateItem(itemId, (item) => ({ ...item, target: nextTarget }));
     };
 
-    const handleDownload = () => {
-        if (!resultUrl)
+    const handleDownload = (item) => {
+        if (!item.resultUrl)
             return;
         const link = document.createElement("a");
-        link.href = resultUrl;
-        link.download = `ai-${activeTool || "result"}.png`;
+        const extension = getResultExtension(item.resultUrl);
+        link.href = item.resultUrl;
+        link.download = `${getSafeBaseName(item.file.name)}-${item.activeTool || activeTool || "result"}.${extension}`;
         link.click();
         addDownloadHistory({
-            id: `${Date.now()}-${activeTool || "ai"}`,
+            id: `${Date.now()}-${item.activeTool || "ai"}`,
             name: link.download,
             type: "image",
             time: new Date().toISOString(),
             source: "ai-tools",
         });
         toast({ title: "Download started", description: link.download });
+    };
+
+    const handleDownloadZip = async () => {
+        const results = itemsRef.current.filter((item) => item.resultUrl);
+        if (!results.length)
+            return;
+        const zip = new JSZip();
+        await Promise.all(results.map(async (item) => {
+            const extension = getResultExtension(item.resultUrl);
+            const filename = `${getSafeBaseName(item.file.name)}-${item.activeTool || "result"}.${extension}`;
+            const blob = await fetch(item.resultUrl).then((response) => response.blob());
+            zip.file(filename, blob);
+        }));
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(zipBlob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `ai-results-${Date.now()}.zip`;
+        link.click();
+        URL.revokeObjectURL(url);
+        addDownloadHistory({
+            id: `${Date.now()}-ai-zip`,
+            name: link.download,
+            type: "zip",
+            time: new Date().toISOString(),
+            source: "ai-tools",
+        });
+        toast({ title: "ZIP download started", description: link.download });
+    };
+
+    const handleRemoveItem = (itemId) => {
+        setItems((prev) => {
+            const next = prev.filter((item) => item.id !== itemId);
+            const removed = prev.find((item) => item.id === itemId);
+            if (removed) {
+                URL.revokeObjectURL(removed.previewUrl);
+            }
+            return next;
+        });
     };
 
     return (<AppShell>
@@ -261,53 +342,86 @@ export default function AiToolsPage() {
           </p>
         </section>
 
-        <section className="glass-card rounded-2xl p-6">
-          <div className="flex items-center gap-3">
-            <Sparkles className="h-5 w-5 text-primary"/>
-            <h3 className="text-lg font-semibold">AI Enhancer Suite</h3>
-          </div>
-          <div className="mt-4 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
-            <div className="space-y-4">
-              <input type="file" accept="image/*" className="w-full rounded-lg border border-border/60 bg-background/60 p-2 text-sm" onChange={(event) => setFile(event.target.files?.[0] || null)}/>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {tools.map((tool) => (<button key={tool.id} className={tool.primary
-                        ? "rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-                        : "rounded-lg border border-border/60 px-3 py-2 text-sm text-foreground transition hover:bg-muted/60 disabled:opacity-50"} onClick={() => handleAction(tool.id)} disabled={!file || isLoading}>
-                  {isLoading && activeTool === tool.id ? "Working..." : tool.label}
-                </button>))}
-              </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <p className="text-xs text-muted-foreground">
-                Object Remove uses the point selected in the preview.
-              </p>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-xl border border-border/60 bg-background/60 p-4">
-                <div className="mb-3 flex items-center justify-between text-sm">
-                  <span className="font-medium">Original</span>
-                  {file && <span className="text-xs text-muted-foreground">{file.name}</span>}
-                </div>
-                {previewUrl ? (<button className="relative block w-full overflow-hidden rounded-lg bg-muted/30" onClick={handleTarget}>
-                    <img src={previewUrl} alt="Original preview" className="w-full"/>
-                    <span className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-primary bg-background/80" style={{ left: `${target.x * 100}%`, top: `${target.y * 100}%` }}/>
-                  </button>) : (<div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-                    Upload an image.
-                  </div>)}
-              </div>
-              <div className="rounded-xl border border-border/60 bg-background/60 p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-sm font-medium">Result</span>
-                  <button className="rounded-lg border border-border/60 p-2 text-muted-foreground transition hover:text-foreground disabled:opacity-40" onClick={handleDownload} disabled={!resultUrl}>
-                    <Download className="h-4 w-4"/>
-                  </button>
-                </div>
-                {resultUrl ? (<img src={resultUrl} alt="AI result" className="w-full rounded-lg"/>) : (<div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-                    Result preview appears here.
-                  </div>)}
-              </div>
-            </div>
-          </div>
-        </section>
+                <section className="glass-card rounded-2xl p-6">
+                    <div className="flex items-center gap-3">
+                        <Sparkles className="h-5 w-5 text-primary"/>
+                        <h3 className="text-lg font-semibold">AI Enhancer Suite</h3>
+                    </div>
+                    <div className="mt-4 grid gap-6">
+                        <div className="space-y-5">
+                            <input type="file" accept="image/*" multiple className="w-full rounded-lg border border-border/60 bg-background/60 p-2 text-sm" onChange={(event) => {
+                                        handleFiles(event.target.files);
+                                        event.target.value = "";
+                                }}/>
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                <span className="rounded bg-secondary px-2 py-1">Multi-upload</span>
+                                <span className="rounded bg-secondary px-2 py-1">PNG</span>
+                                <span className="rounded bg-secondary px-2 py-1">JPG</span>
+                                <span className="rounded bg-secondary px-2 py-1">WebP</span>
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                {tools.map((tool) => (<button key={tool.id} className={tool.primary
+                                                ? "rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                                                : "rounded-lg border border-border/60 px-3 py-2 text-sm text-foreground transition hover:bg-muted/60 disabled:opacity-50"} onClick={() => handleApplyAll(tool.id)} disabled={!items.length || isBatchLoading}>
+                                    {isBatchLoading && activeTool === tool.id ? "Working..." : `${tool.label} • All`}
+                                </button>))}
+                            </div>
+                            <button className="w-full rounded-lg border border-border/60 px-3 py-2 text-sm text-foreground transition hover:bg-muted/60 disabled:opacity-50" onClick={handleDownloadZip} disabled={!items.some((item) => item.resultUrl)}>
+                                Download ZIP
+                            </button>
+                            {error && <p className="text-sm text-destructive">{error}</p>}
+                            <p className="text-xs text-muted-foreground">
+                                Object Remove uses the point you tap on each preview.
+                            </p>
+                        </div>
+                        <div className="grid gap-4">
+                            {items.length === 0 && (<div className="flex h-64 items-center justify-center rounded-xl border border-dashed border-border/60 text-sm text-muted-foreground">
+                                    Upload images to see previews.
+                                </div>)}
+                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                {items.map((item) => (<div key={item.id} className="rounded-2xl border border-border/60 bg-background/60 p-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                                        <div className="min-w-0">
+                                            <p className="truncate font-medium text-foreground" title={item.file.name}>{item.file.name}</p>
+                                            <p className="text-xs text-muted-foreground">{Math.round(item.file.size / 1024)} KB</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button className="rounded-lg border border-border/60 p-2 text-muted-foreground transition hover:text-foreground" onClick={() => handleRemoveItem(item.id)} aria-label="Remove">
+                                                <Trash2 className="h-4 w-4"/>
+                                            </button>
+                                            <button className="rounded-lg border border-border/60 p-2 text-muted-foreground transition hover:text-foreground disabled:opacity-40" onClick={() => handleDownload(item)} disabled={!item.resultUrl}>
+                                                <Download className="h-4 w-4"/>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 grid gap-4">
+                                        <div className="rounded-xl border border-border/60 bg-muted/10 p-3">
+                                            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Original</p>
+                                            <button className="relative block w-full overflow-hidden rounded-lg bg-muted/30" onClick={(event) => handleTarget(item.id, event)}>
+                                                <img src={item.previewUrl} alt="Original preview" className="aspect-[4/3] w-full object-cover"/>
+                                                <span className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-primary bg-background/80" style={{ left: `${item.target.x * 100}%`, top: `${item.target.y * 100}%` }}/>
+                                            </button>
+                                        </div>
+                                        <div className="rounded-xl border border-border/60 bg-muted/10 p-3">
+                                            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Result</p>
+                                            {item.resultUrl ? (<img src={item.resultUrl} alt="AI result" className="aspect-[4/3] w-full rounded-lg object-cover"/>) : (<div className="flex aspect-[4/3] items-center justify-center text-sm text-muted-foreground">
+                                                    Result preview appears here.
+                                                </div>)}
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 grid gap-2 grid-cols-2 sm:grid-cols-3">
+                                        {tools.map((tool) => (<button key={tool.id} className={tool.primary
+                                                        ? "rounded-lg bg-primary px-2.5 py-2 text-[11px] font-semibold text-primary-foreground disabled:opacity-50"
+                                                        : "rounded-lg border border-border/60 px-2.5 py-2 text-[11px] text-foreground transition hover:bg-muted/60 disabled:opacity-50"} onClick={() => handleAction(item.id, tool.id)} disabled={item.isLoading}>
+                                            {item.isLoading && item.activeTool === tool.id ? "Working..." : tool.label}
+                                        </button>))}
+                                    </div>
+                                    {item.error && <p className="mt-3 text-sm text-destructive">{item.error}</p>}
+                                </div>))}
+                            </div>
+                        </div>
+                    </div>
+                </section>
       </div>
     </AppShell>);
 }

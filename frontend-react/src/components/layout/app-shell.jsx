@@ -3,13 +3,14 @@ import { PropsWithChildren } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { LayoutGrid, Image as ImageIcon, FileText, Sparkles, Repeat, FolderOpen, UserCircle, CreditCard, } from "lucide-react";
+import { LayoutGrid, Image as ImageIcon, FileText, Sparkles, Repeat, FolderOpen, UserCircle, CreditCard, SlidersHorizontal, } from "lucide-react";
 const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutGrid },
     { href: "/image-editor", label: "Image Editor", icon: ImageIcon },
     { href: "/pdf-tools", label: "PDF Tools", icon: FileText },
     { href: "/converter", label: "Converter", icon: Repeat },
     { href: "/ai-tools", label: "AI Tools", icon: Sparkles },
+    { href: "/compression", label: "Compression", icon: SlidersHorizontal },
     { href: "/projects", label: "Saved Projects", icon: FolderOpen },
     { href: "/pricing", label: "Pricing", icon: CreditCard },
     { href: "/profile", label: "Profile", icon: UserCircle },

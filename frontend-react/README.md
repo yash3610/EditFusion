@@ -43,6 +43,31 @@ export default defineConfig([
 ])
 ```
 
+## Smart Image Compression Module
+
+Route: `/compression`
+
+### Install dependencies
+
+```bash
+npm install
+```
+
+### Run locally
+
+```bash
+npm run dev
+```
+
+### Features
+
+- Multi-image upload, drag/drop, paste
+- Browser-only compression with quality controls
+- Live before/after compare slider
+- Format conversion (JPEG, PNG, WEBP, AVIF)
+- Resize presets and metadata removal
+- Batch download as ZIP
+
 You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
 ```js

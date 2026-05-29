@@ -8,6 +8,7 @@ import ImageEditorPage from "@/pages/image-editor/page";
 import PdfToolsPage from "@/pages/pdf-tools/page";
 import ConverterPage from "@/pages/converter/page";
 import AiToolsPage from "@/pages/ai-tools/page";
+import CompressionPage from "@/pages/compression/page";
 import ProjectsPage from "@/pages/projects/page";
 import PricingPage from "@/pages/pricing/page";
 import ProfilePage from "@/pages/profile/page";
@@ -23,6 +24,7 @@ function App() {
           <Route path="/pdf-tools" element={<PdfToolsPage />}/>
           <Route path="/converter" element={<ConverterPage />}/>
           <Route path="/ai-tools" element={<AiToolsPage />}/>
+          <Route path="/compression" element={<CompressionPage />}/>
           <Route path="/projects" element={<ProjectsPage />}/>
           <Route path="/pricing" element={<PricingPage />}/>
           <Route path="/profile" element={<ProfilePage />}/>
