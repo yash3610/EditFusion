@@ -10,7 +10,7 @@ const createSchema = z.object({
 
 export const listProjects = async (req, res, next) => {
   try {
-    const projects = await Project.find({ ownerId: req.user.sub })
+    const projects = await Project.find({ ownerId: req.user.id })
       .sort({ updatedAt: -1 })
       .limit(100);
     res.json(projects);
@@ -23,7 +23,7 @@ export const createProject = async (req, res, next) => {
   try {
     const payload = createSchema.parse(req.body);
     const project = await Project.create({
-      ownerId: req.user.sub,
+      ownerId: req.user.id,
       name: payload.name,
       type: payload.type,
       thumbnailUrl: payload.thumbnailUrl,
@@ -39,7 +39,7 @@ export const updateProject = async (req, res, next) => {
   try {
     const updates = req.body;
     const project = await Project.findOneAndUpdate(
-      { _id: req.params.id, ownerId: req.user.sub },
+      { _id: req.params.id, ownerId: req.user.id },
       updates,
       { new: true }
     );
@@ -56,7 +56,7 @@ export const deleteProject = async (req, res, next) => {
   try {
     const project = await Project.findOneAndDelete({
       _id: req.params.id,
-      ownerId: req.user.sub,
+      ownerId: req.user.id,
     });
     if (!project) {
       return res.status(404).json({ message: "Project not found" });

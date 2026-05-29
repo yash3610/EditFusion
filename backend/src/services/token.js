@@ -25,4 +25,7 @@ export const createRefreshToken = (user) => {
   });
 };
 
-export const verifyRefreshToken = (token) => jwt.verify(token, env.JWT_REFRESH_SECRET);
+export const verifyRefreshToken = (token) => jwt.verify(token, env.JWT_REFRESH_SECRET, {
+  issuer: "editfusion",
+  audience: "editfusion:web",
+});

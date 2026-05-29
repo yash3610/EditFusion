@@ -6,6 +6,7 @@ const AuthContext = createContext(undefined);
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [token, setTokenState] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
     useEffect(() => {
         const bootstrap = async () => {
             const stored = getToken();
@@ -39,6 +40,9 @@ export function AuthProvider({ children }) {
                     setTokenState(null);
                     setUser(null);
                 }
+            }
+            finally {
+                setIsLoading(false);
             }
         };
         bootstrap();
@@ -81,7 +85,7 @@ export function AuthProvider({ children }) {
         setTokenState(null);
         setUser(null);
     };
-    const value = useMemo(() => ({ user, token, login, loginWithGoogle, register, logout }), [user, token]);
+    const value = useMemo(() => ({ user, token, isLoading, login, loginWithGoogle, register, logout }), [user, token, isLoading]);
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 export const useAuth = () => {
