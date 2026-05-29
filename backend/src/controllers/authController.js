@@ -2,22 +2,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { User } from "../models/User.js";
 import { createAccessToken, createRefreshToken, verifyRefreshToken } from "../services/token.js";
-import { env } from "../config/env.js";
-
-const refreshCookieOptions = {
-  httpOnly: true,
-  secure: env.COOKIE_SECURE,
-  sameSite: env.COOKIE_SAMESITE,
-  domain: env.COOKIE_DOMAIN || undefined,
-  path: "/api/auth",
-};
-
-const setRefreshCookie = (res, token) => {
-  res.cookie("ef_refresh", token, {
-    ...refreshCookieOptions,
-    maxAge: 1000 * 60 * 60 * 24 * 7,
-  });
-};
+import { setRefreshCookie, clearRefreshCookie } from "../services/auth-cookies.js";
 
 const registerSchema = z.object({
   name: z.string().min(2),
@@ -147,7 +132,7 @@ export const logout = async (req, res, next) => {
     if (req.user?.id) {
       await User.updateOne({ _id: req.user.id }, { $inc: { tokenVersion: 1 } });
     }
-    res.clearCookie("ef_refresh", refreshCookieOptions);
+    clearRefreshCookie(res);
     res.json({ status: "ok" });
   } catch (error) {
     next(error);

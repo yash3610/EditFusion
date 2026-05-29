@@ -61,12 +61,12 @@ export const QueueItemCard = ({
           <span>Original</span>
           <span>Optimized</span>
         </div>
-        <div className="h-[170px] overflow-hidden rounded-lg bg-background/40">
+        <div className="h-42.5 overflow-hidden rounded-lg bg-background/40">
           {ready ? (
             <ReactCompareSlider
               itemOne={<ReactCompareSliderImage src={item.previewUrl} alt="Original" />}
               itemTwo={<ReactCompareSliderImage src={item.resultUrl} alt="Optimized" />}
-              className="h-[170px]"
+              className="h-42.5"
             />
           ) : (
             <div className="flex h-full items-center justify-center text-xs text-muted-foreground">

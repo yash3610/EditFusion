@@ -22,11 +22,11 @@ export function AppShell({ children }) {
   const { user, token, logout } = useAuth();
   const navigate = useNavigate();
     return (<div className="min-h-screen bg-background text-foreground">
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-teal-400/15 via-transparent to-transparent"/>
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top,var(--tw-gradient-stops))] from-teal-400/15 via-transparent to-transparent"/>
       <div className="flex min-h-screen">
         <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border/60 bg-card/80 p-6 backdrop-blur xl:flex">
           <Link to="/" className="mb-8 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-teal-400 to-cyan-500 text-slate-900 shadow-lg">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-teal-400 to-cyan-500 text-slate-900 shadow-lg">
               EF
             </div>
             <div>

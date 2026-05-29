@@ -32,7 +32,7 @@ export const UploadPanel = ({ onFiles, isProcessing }) => {
 
   return (
     <motion.section
-      className="glass-card h-full min-h-[420px] rounded-2xl border border-border/60 p-6"
+      className="glass-card h-full min-h-105 rounded-2xl border border-border/60 p-6"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
@@ -49,7 +49,7 @@ export const UploadPanel = ({ onFiles, isProcessing }) => {
       </div>
 
       <label
-        className={`mt-4 flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-10 text-center transition ${
+        className={`mt-4 flex min-h-55 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-10 text-center transition ${
           isDragging ? "border-primary bg-primary/10" : "border-border/60 bg-muted/20 hover:bg-muted/30"
         }`}
         onDragOver={handleDragOver}

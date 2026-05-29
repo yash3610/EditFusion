@@ -398,13 +398,13 @@ export default function AiToolsPage() {
                                         <div className="rounded-xl border border-border/60 bg-muted/10 p-3">
                                             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Original</p>
                                             <button className="relative block w-full overflow-hidden rounded-lg bg-muted/30" onClick={(event) => handleTarget(item.id, event)}>
-                                                <img src={item.previewUrl} alt="Original preview" className="aspect-[4/3] w-full object-cover"/>
+                                                <img src={item.previewUrl} alt="Original preview" className="aspect-4/3 w-full object-cover"/>
                                                 <span className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-primary bg-background/80" style={{ left: `${item.target.x * 100}%`, top: `${item.target.y * 100}%` }}/>
                                             </button>
                                         </div>
                                         <div className="rounded-xl border border-border/60 bg-muted/10 p-3">
                                             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Result</p>
-                                            {item.resultUrl ? (<img src={item.resultUrl} alt="AI result" className="aspect-[4/3] w-full rounded-lg object-cover"/>) : (<div className="flex aspect-[4/3] items-center justify-center text-sm text-muted-foreground">
+                                            {item.resultUrl ? (<img src={item.resultUrl} alt="AI result" className="aspect-4/3 w-full rounded-lg object-cover"/>) : (<div className="flex aspect-4/3 items-center justify-center text-sm text-muted-foreground">
                                                     Result preview appears here.
                                                 </div>)}
                                         </div>

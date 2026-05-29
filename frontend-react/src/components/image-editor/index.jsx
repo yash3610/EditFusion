@@ -124,7 +124,7 @@ export function ImageEditor() {
             return;
         setSyncPending(true);
     }, [editor.imageState, editor.layers, projectId, token, editor.originalImage]);
-    return (<div className="flex h-[calc(100vh-8rem)] min-h-[640px] flex-col overflow-hidden rounded-xl border border-border bg-background">
+    return (<div className="flex h-[calc(100vh-8rem)] min-h-160 flex-col overflow-hidden rounded-xl border border-border bg-background">
       <Header onLoadImage={handleLoadImage} onExport={handleExport} hasImage={!!editor.originalImage} imageInfo={editor.originalImage
             ? { width: editor.imageState.width, height: editor.imageState.height }
             : null}/>

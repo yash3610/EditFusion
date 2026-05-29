@@ -19,19 +19,19 @@ function App() {
     return (<ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
       <AuthProvider>
         <Routes>
-          <Route path="/" element={<HomePage />}/>
+          <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>}/>
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>}/>
-          <Route path="/image-editor" element={<ImageEditorPage />}/>
-          <Route path="/pdf-tools" element={<PdfToolsPage />}/>
-          <Route path="/converter" element={<ConverterPage />}/>
-          <Route path="/ai-tools" element={<AiToolsPage />}/>
-          <Route path="/compression" element={<CompressionPage />}/>
+          <Route path="/image-editor" element={<ProtectedRoute><ImageEditorPage /></ProtectedRoute>}/>
+          <Route path="/pdf-tools" element={<ProtectedRoute><PdfToolsPage /></ProtectedRoute>}/>
+          <Route path="/converter" element={<ProtectedRoute><ConverterPage /></ProtectedRoute>}/>
+          <Route path="/ai-tools" element={<ProtectedRoute><AiToolsPage /></ProtectedRoute>}/>
+          <Route path="/compression" element={<ProtectedRoute><CompressionPage /></ProtectedRoute>}/>
           <Route path="/projects" element={<ProtectedRoute><ProjectsPage /></ProtectedRoute>}/>
-          <Route path="/pricing" element={<PricingPage />}/>
+          <Route path="/pricing" element={<ProtectedRoute><PricingPage /></ProtectedRoute>}/>
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>}/>
           <Route path="/login" element={<LoginPage />}/>
           <Route path="/register" element={<RegisterPage />}/>
-          <Route path="*" element={<HomePage />}/>
+          <Route path="*" element={<ProtectedRoute><HomePage /></ProtectedRoute>}/>
         </Routes>
         <Toaster />
       </AuthProvider>

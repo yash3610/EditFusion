@@ -11,7 +11,7 @@ export const ComparisonPanel = ({ item, onCompress }) => {
   const result = item?.resultUrl;
 
   return (
-    <section className="glass-card h-full min-h-[420px] rounded-2xl border border-border/60 p-6">
+    <section className="glass-card h-full min-h-105 rounded-2xl border border-border/60 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold">Live preview</p>
@@ -47,7 +47,7 @@ export const ComparisonPanel = ({ item, onCompress }) => {
               <ReactCompareSlider
                 itemOne={<ReactCompareSliderImage src={preview} alt="Original" />}
                 itemTwo={<ReactCompareSliderImage src={result} alt="Optimized" />}
-                className="min-h-[260px]"
+                className="min-h-65"
               />
             </div>
           </div>

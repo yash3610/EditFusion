@@ -27,7 +27,7 @@ export const SettingsPanel = ({ onProcessAll, isBatchProcessing, onDownloadAll }
   const setSettings = useCompressionStore((state) => state.setSettings);
 
   return (
-    <section className="glass-card h-full min-h-[420px] rounded-2xl border border-border/60 p-6">
+    <section className="glass-card h-full min-h-105 rounded-2xl border border-border/60 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <SlidersHorizontal className="h-5 w-5 text-primary" />
@@ -59,7 +59,7 @@ export const SettingsPanel = ({ onProcessAll, isBatchProcessing, onDownloadAll }
       </div>
 
       <div className="mt-5 grid gap-3 md:grid-cols-2">
-        <div className="min-h-[160px] rounded-xl border border-border/60 bg-muted/20 p-4">
+        <div className="min-h-40 rounded-xl border border-border/60 bg-muted/20 p-4">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <Gauge className="h-4 w-4" /> Quality
           </div>
@@ -72,14 +72,14 @@ export const SettingsPanel = ({ onProcessAll, isBatchProcessing, onDownloadAll }
               onChange={(event) => setSettings({ quality: Number(event.target.value) })}
               className="h-2 w-full appearance-none rounded-full bg-muted/70 accent-primary"
             />
-            <div className="min-w-[48px] rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-center text-xs font-semibold">
+            <div className="min-w-12 rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-center text-xs font-semibold">
               {settings.quality}
             </div>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">Higher quality keeps details but increases size.</p>
         </div>
 
-        <div className="min-h-[160px] rounded-xl border border-border/60 bg-muted/20 p-4">
+        <div className="min-h-40 rounded-xl border border-border/60 bg-muted/20 p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Format</p>
           <select
             className="mt-3 w-full rounded-lg border border-border/60 bg-background/60 p-2 text-sm"
@@ -93,7 +93,7 @@ export const SettingsPanel = ({ onProcessAll, isBatchProcessing, onDownloadAll }
           <p className="mt-3 text-xs text-muted-foreground">Auto picks best format per image.</p>
         </div>
 
-        <div className="min-h-[160px] rounded-xl border border-border/60 bg-muted/20 p-4">
+        <div className="min-h-40 rounded-xl border border-border/60 bg-muted/20 p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Compression mode</p>
           <select
             className="mt-3 w-full rounded-lg border border-border/60 bg-background/60 p-2 text-sm"
@@ -107,7 +107,7 @@ export const SettingsPanel = ({ onProcessAll, isBatchProcessing, onDownloadAll }
           <p className="mt-3 text-xs text-muted-foreground">Smart mode balances size and clarity.</p>
         </div>
 
-        <div className="min-h-[160px] rounded-xl border border-border/60 bg-muted/20 p-4">
+        <div className="min-h-40 rounded-xl border border-border/60 bg-muted/20 p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Compression engine</p>
           <select
             className="mt-3 w-full rounded-lg border border-border/60 bg-background/60 p-2 text-sm"
