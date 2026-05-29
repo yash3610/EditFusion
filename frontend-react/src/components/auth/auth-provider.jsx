@@ -1,16 +1,47 @@
 "use client";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { clearToken, getToken, setToken } from "@/lib/auth-storage";
+import { clearToken, clearUser, getToken, getUser, setToken, setUser } from "@/lib/auth-storage";
 const AuthContext = createContext(undefined);
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [token, setTokenState] = useState(null);
     useEffect(() => {
-        const stored = getToken();
-        if (stored) {
-            setTokenState(stored);
-        }
+        const bootstrap = async () => {
+            const stored = getToken();
+            const storedUser = getUser();
+            if (stored) {
+                setTokenState(stored);
+            }
+            if (storedUser) {
+                setUser(storedUser);
+            }
+            try {
+                const me = await apiFetch("/api/auth/me", { method: "GET" });
+                if (me?.user) {
+                    setUser(me.user);
+                }
+            }
+            catch {
+                try {
+                    const refreshed = await apiFetch("/api/auth/refresh", { method: "POST" }, false);
+                    if (refreshed?.token) {
+                        setToken(refreshed.token);
+                        setTokenState(refreshed.token);
+                    }
+                    if (refreshed?.user) {
+                        setUser(refreshed.user);
+                    }
+                }
+                catch {
+                    clearToken();
+                    clearUser();
+                    setTokenState(null);
+                    setUser(null);
+                }
+            }
+        };
+        bootstrap();
     }, []);
     const login = async (email, password) => {
         const data = await apiFetch("/api/auth/login", {
@@ -39,8 +70,14 @@ export function AuthProvider({ children }) {
         setTokenState(data.token);
         setUser(data.user);
     };
-    const logout = () => {
+    const logout = async () => {
+        try {
+            await apiFetch("/api/auth/logout", { method: "POST" }, false);
+        }
+        catch {
+        }
         clearToken();
+        clearUser();
         setTokenState(null);
         setUser(null);
     };

@@ -1,7 +1,22 @@
 import { z } from "zod";
 import { env } from "../config/env.js";
 import { User } from "../models/User.js";
-import { createToken } from "../services/token.js";
+import { createAccessToken, createRefreshToken } from "../services/token.js";
+
+const refreshCookieOptions = {
+  httpOnly: true,
+  secure: env.COOKIE_SECURE,
+  sameSite: env.COOKIE_SAMESITE,
+  domain: env.COOKIE_DOMAIN || undefined,
+  path: "/api/auth",
+};
+
+const setRefreshCookie = (res, token) => {
+  res.cookie("ef_refresh", token, {
+    ...refreshCookieOptions,
+    maxAge: 1000 * 60 * 60 * 24 * 7,
+  });
+};
 
 const googlePayloadSchema = z.object({
   email: z.string().email(),
@@ -27,7 +42,9 @@ export const handleGoogleCallback = async (req, res, next) => {
       await user.save();
     }
 
-    const token = createToken(user);
+    const token = createAccessToken(user);
+    const refreshToken = createRefreshToken(user);
+    setRefreshCookie(res, refreshToken);
     res.json({
       token,
       user: {
@@ -79,7 +96,9 @@ export const handleGoogleToken = async (req, res, next) => {
       await user.save();
     }
 
-    const token = createToken(user);
+    const token = createAccessToken(user);
+    const refreshToken = createRefreshToken(user);
+    setRefreshCookie(res, refreshToken);
     res.json({
       token,
       user: {

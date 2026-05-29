@@ -15,6 +15,12 @@ export const env = {
   MONGO_URI: getEnv("MONGO_URI"),
   JWT_SECRET: getEnv("JWT_SECRET"),
   JWT_EXPIRES_IN: getEnv("JWT_EXPIRES_IN", "7d"),
+  JWT_ACCESS_EXPIRES_IN: getEnv("JWT_ACCESS_EXPIRES_IN", "15m"),
+  JWT_REFRESH_EXPIRES_IN: getEnv("JWT_REFRESH_EXPIRES_IN", "7d"),
+  JWT_REFRESH_SECRET: getEnv("JWT_REFRESH_SECRET", process.env.JWT_SECRET),
+  COOKIE_SECURE: getEnv("COOKIE_SECURE", "false") === "true",
+  COOKIE_SAMESITE: getEnv("COOKIE_SAMESITE", "lax"),
+  COOKIE_DOMAIN: process.env.COOKIE_DOMAIN,
   CORS_ORIGIN: getEnv(
     "CORS_ORIGIN",
     "http://localhost:3000,http://localhost:5173"

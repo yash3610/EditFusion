@@ -1,7 +1,23 @@
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { User } from "../models/User.js";
-import { createToken } from "../services/token.js";
+import { createAccessToken, createRefreshToken, verifyRefreshToken } from "../services/token.js";
+import { env } from "../config/env.js";
+
+const refreshCookieOptions = {
+  httpOnly: true,
+  secure: env.COOKIE_SECURE,
+  sameSite: env.COOKIE_SAMESITE,
+  domain: env.COOKIE_DOMAIN || undefined,
+  path: "/api/auth",
+};
+
+const setRefreshCookie = (res, token) => {
+  res.cookie("ef_refresh", token, {
+    ...refreshCookieOptions,
+    maxAge: 1000 * 60 * 60 * 24 * 7,
+  });
+};
 
 const registerSchema = z.object({
   name: z.string().min(2),
@@ -29,7 +45,9 @@ export const register = async (req, res, next) => {
       passwordHash,
     });
 
-    const token = createToken(user);
+    const token = createAccessToken(user);
+    const refreshToken = createRefreshToken(user);
+    setRefreshCookie(res, refreshToken);
     res.status(201).json({
       token,
       user: {
@@ -57,7 +75,9 @@ export const login = async (req, res, next) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const token = createToken(user);
+    const token = createAccessToken(user);
+    const refreshToken = createRefreshToken(user);
+    setRefreshCookie(res, refreshToken);
     res.json({
       token,
       user: {
@@ -67,6 +87,68 @@ export const login = async (req, res, next) => {
         avatarUrl: user.avatarUrl,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const me = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id).select("_id name email avatarUrl");
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    res.json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        avatarUrl: user.avatarUrl,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const refresh = async (req, res, next) => {
+  try {
+    const token = req.cookies?.ef_refresh;
+    if (!token) {
+      return res.status(401).json({ message: "Missing refresh token" });
+    }
+
+    const payload = verifyRefreshToken(token);
+    const user = await User.findById(payload.sub).select("_id name email avatarUrl tokenVersion");
+    if (!user || user.tokenVersion !== payload.tokenVersion) {
+      return res.status(401).json({ message: "Invalid refresh token" });
+    }
+
+    const accessToken = createAccessToken(user);
+    const refreshToken = createRefreshToken(user);
+    setRefreshCookie(res, refreshToken);
+
+    res.json({
+      token: accessToken,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        avatarUrl: user.avatarUrl,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const logout = async (req, res, next) => {
+  try {
+    if (req.user?.id) {
+      await User.updateOne({ _id: req.user.id }, { $inc: { tokenVersion: 1 } });
+    }
+    res.clearCookie("ef_refresh", refreshCookieOptions);
+    res.json({ status: "ok" });
   } catch (error) {
     next(error);
   }

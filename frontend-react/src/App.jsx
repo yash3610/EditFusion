@@ -14,20 +14,21 @@ import PricingPage from "@/pages/pricing/page";
 import ProfilePage from "@/pages/profile/page";
 import LoginPage from "@/pages/login/page";
 import RegisterPage from "@/pages/register/page";
+import { ProtectedRoute } from "@/components/auth/protected-route";
 function App() {
     return (<ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
       <AuthProvider>
         <Routes>
           <Route path="/" element={<HomePage />}/>
-          <Route path="/dashboard" element={<DashboardPage />}/>
+          <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>}/>
           <Route path="/image-editor" element={<ImageEditorPage />}/>
           <Route path="/pdf-tools" element={<PdfToolsPage />}/>
           <Route path="/converter" element={<ConverterPage />}/>
           <Route path="/ai-tools" element={<AiToolsPage />}/>
           <Route path="/compression" element={<CompressionPage />}/>
-          <Route path="/projects" element={<ProjectsPage />}/>
+          <Route path="/projects" element={<ProtectedRoute><ProjectsPage /></ProtectedRoute>}/>
           <Route path="/pricing" element={<PricingPage />}/>
-          <Route path="/profile" element={<ProfilePage />}/>
+          <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>}/>
           <Route path="/login" element={<LoginPage />}/>
           <Route path="/register" element={<RegisterPage />}/>
           <Route path="*" element={<HomePage />}/>

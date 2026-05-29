@@ -1,8 +1,9 @@
 "use client";
 import { PropsWithChildren } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { useAuth } from "@/components/auth/auth-provider";
 import { LayoutGrid, Image as ImageIcon, FileText, Sparkles, Repeat, FolderOpen, UserCircle, CreditCard, SlidersHorizontal, } from "lucide-react";
 const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutGrid },
@@ -18,6 +19,8 @@ const navItems = [
 export function AppShell({ children }) {
     const location = useLocation();
     const pathname = location.pathname;
+  const { user, token, logout } = useAuth();
+  const navigate = useNavigate();
     return (<div className="min-h-screen bg-background text-foreground">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-teal-400/15 via-transparent to-transparent"/>
       <div className="flex min-h-screen">
@@ -57,12 +60,24 @@ export function AppShell({ children }) {
                 <h1 className="text-lg font-semibold">Your Creative Dashboard</h1>
               </div>
               <div className="flex items-center gap-3">
-                <Link to="/login" className="rounded-full border border-border/60 px-4 py-2 text-sm text-muted-foreground transition hover:text-foreground">
-                  Sign In
-                </Link>
-                <Link to="/register" className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow">
-                  Start Free
-                </Link>
+                {token ? (<>
+                  <Link to="/profile" className="rounded-full border border-border/60 px-4 py-2 text-sm text-muted-foreground transition hover:text-foreground">
+                    {user?.name || "Profile"}
+                  </Link>
+                  <button type="button" className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow" onClick={() => {
+                        logout();
+                        navigate("/");
+                    }}>
+                    Log Out
+                  </button>
+                </>) : (<>
+                  <Link to="/login" className="rounded-full border border-border/60 px-4 py-2 text-sm text-muted-foreground transition hover:text-foreground">
+                    Sign In
+                  </Link>
+                  <Link to="/register" className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow">
+                    Start Free
+                  </Link>
+                </>)}
                 <ThemeToggle />
               </div>
             </div>
