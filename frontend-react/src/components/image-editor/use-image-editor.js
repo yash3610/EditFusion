@@ -126,12 +126,27 @@ export function useImageEditor() {
         setLayers((prev) => prev.filter((layer) => layer.id !== id));
         setActiveLayerId((prev) => (prev === id ? null : prev));
     }, []);
+    const duplicateLayer = useCallback((id) => {
+        setLayers((prev) => {
+            const layer = prev.find((item) => item.id === id);
+            if (!layer)
+                return prev;
+            const duplicate = {
+                ...layer,
+                id: crypto.randomUUID(),
+                x: (layer.x || 0) + 24,
+                y: (layer.y || 0) + 24,
+            };
+            setActiveLayerId(duplicate.id);
+            return [...prev, duplicate];
+        });
+    }, []);
     const moveLayer = useCallback((id, direction) => {
         setLayers((prev) => {
             const index = prev.findIndex((layer) => layer.id === id);
             if (index === -1)
                 return prev;
-            const newIndex = direction === "up" ? index - 1 : index + 1;
+            const newIndex = direction === "up" ? index + 1 : index - 1;
             if (newIndex < 0 || newIndex >= prev.length)
                 return prev;
             const updated = [...prev];
@@ -172,7 +187,10 @@ export function useImageEditor() {
         const ctx = canvas.getContext("2d");
         if (!ctx)
             return;
-        const { x, y, width, height } = imageState.cropArea;
+        const x = Math.max(0, Math.round(imageState.cropArea.x));
+        const y = Math.max(0, Math.round(imageState.cropArea.y));
+        const width = Math.max(1, Math.round(imageState.cropArea.width));
+        const height = Math.max(1, Math.round(imageState.cropArea.height));
         const tempCanvas = document.createElement("canvas");
         tempCanvas.width = width;
         tempCanvas.height = height;
@@ -269,6 +287,7 @@ export function useImageEditor() {
         addLayer,
         updateLayer,
         removeLayer,
+        duplicateLayer,
         moveLayer,
         setActiveLayerId,
     };

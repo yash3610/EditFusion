@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PDFDocument, degrees, rgb } from "pdf-lib";
 import { addDownloadHistory, addRecentFile } from "@/lib/history";
+import { useToast } from "@/hooks/use-toast";
 import { ArrowDownToLine, ArrowUp, ArrowDown, FileText, RotateCw, Scissors, Trash2, } from "lucide-react";
 const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob);
@@ -12,12 +13,32 @@ const downloadBlob = (blob, filename) => {
     link.click();
     URL.revokeObjectURL(url);
 };
+const parsePageSelection = (value, pageCount) => {
+    const pages = new Set();
+    value.split(",").forEach((part) => {
+        const trimmed = part.trim();
+        if (!trimmed)
+            return;
+        const [startText, endText] = trimmed.split("-").map((item) => item.trim());
+        const start = Number.parseInt(startText, 10);
+        const end = endText ? Number.parseInt(endText, 10) : start;
+        if (!Number.isInteger(start) || !Number.isInteger(end))
+            return;
+        const min = Math.max(1, Math.min(start, end));
+        const max = Math.min(pageCount, Math.max(start, end));
+        for (let page = min; page <= max; page += 1) {
+            pages.add(page - 1);
+        }
+    });
+    return Array.from(pages).sort((a, b) => a - b);
+};
 export default function PdfToolsPage() {
+    const { toast } = useToast();
     const [mergeFiles, setMergeFiles] = useState([]);
     const [splitFile, setSplitFile] = useState(null);
     const [splitRange, setSplitRange] = useState("1-1");
     const [rotateFile, setRotateFile] = useState(null);
-    const [rotatePage, setRotatePage] = useState(1);
+    const [rotatePages, setRotatePages] = useState("1");
     const [rotateDegrees, setRotateDegrees] = useState(90);
     const [deleteFile, setDeleteFile] = useState(null);
     const [deletePages, setDeletePages] = useState("1");
@@ -75,8 +96,10 @@ export default function PdfToolsPage() {
         load();
     }, [reorderFile]);
     const handleMerge = async () => {
-        if (mergeFiles.length < 2)
+        if (mergeFiles.length < 2) {
+            toast({ title: "Select PDFs", description: "Choose at least two PDFs to merge.", variant: "destructive" });
             return;
+        }
         const merged = await PDFDocument.create();
         for (const file of mergeFiles) {
             const bytes = await file.arrayBuffer();
@@ -93,15 +116,20 @@ export default function PdfToolsPage() {
             time: new Date().toISOString(),
             source: "pdf-tools",
         });
+        toast({ title: "PDF merged", description: "merged.pdf download started." });
     };
     const handleSplit = async () => {
-        if (!splitFile)
+        if (!splitFile) {
+            toast({ title: "Select a PDF", description: "Choose a PDF before splitting.", variant: "destructive" });
             return;
+        }
         const [start, end] = splitRange
             .split("-")
             .map((value) => Number.parseInt(value.trim(), 10));
-        if (!start || !end || start > end)
+        if (!start || !end || start > end) {
+            toast({ title: "Invalid range", description: "Use a range like 1-3.", variant: "destructive" });
             return;
+        }
         const bytes = await splitFile.arrayBuffer();
         const doc = await PDFDocument.load(bytes);
         const output = await PDFDocument.create();
@@ -116,16 +144,23 @@ export default function PdfToolsPage() {
             time: new Date().toISOString(),
             source: "pdf-tools",
         });
+        toast({ title: "PDF split", description: "split.pdf download started." });
     };
     const handleRotate = async () => {
-        if (!rotateFile)
+        if (!rotateFile) {
+            toast({ title: "Select a PDF", description: "Choose a PDF before rotating pages.", variant: "destructive" });
             return;
+        }
         const bytes = await rotateFile.arrayBuffer();
         const doc = await PDFDocument.load(bytes);
-        const page = doc.getPage(rotatePage - 1);
-        if (!page)
+        const pagesToRotate = parsePageSelection(rotatePages, doc.getPageCount());
+        if (pagesToRotate.length === 0) {
+            toast({ title: "Invalid pages", description: "Use pages like 1,3,5-8.", variant: "destructive" });
             return;
-        page.setRotation(degrees(rotateDegrees));
+        }
+        pagesToRotate.forEach((pageIndex) => {
+            doc.getPage(pageIndex).setRotation(degrees(rotateDegrees));
+        });
         const pdfBytes = await doc.save();
         downloadBlob(new Blob([pdfBytes], { type: "application/pdf" }), "rotated.pdf");
         addDownloadHistory({
@@ -135,16 +170,20 @@ export default function PdfToolsPage() {
             time: new Date().toISOString(),
             source: "pdf-tools",
         });
+        toast({ title: "Pages rotated", description: `${pagesToRotate.length} page(s) updated.` });
     };
     const handleDelete = async () => {
-        if (!deleteFile)
+        if (!deleteFile) {
+            toast({ title: "Select a PDF", description: "Choose a PDF before deleting pages.", variant: "destructive" });
             return;
-        const pagesToDelete = deletePages
-            .split(",")
-            .map((value) => Number.parseInt(value.trim(), 10) - 1)
-            .filter((value) => value >= 0);
+        }
         const bytes = await deleteFile.arrayBuffer();
         const doc = await PDFDocument.load(bytes);
+        const pagesToDelete = parsePageSelection(deletePages, doc.getPageCount());
+        if (pagesToDelete.length === 0 || pagesToDelete.length >= doc.getPageCount()) {
+            toast({ title: "Invalid pages", description: "Select valid pages, but leave at least one page in the PDF.", variant: "destructive" });
+            return;
+        }
         pagesToDelete
             .sort((a, b) => b - a)
             .forEach((pageIndex) => {
@@ -161,6 +200,7 @@ export default function PdfToolsPage() {
             time: new Date().toISOString(),
             source: "pdf-tools",
         });
+        toast({ title: "Pages deleted", description: `${pagesToDelete.length} page(s) removed.` });
     };
     return (<AppShell>
       <div className="grid gap-8">
@@ -206,7 +246,7 @@ export default function PdfToolsPage() {
           <section className="glass-card rounded-2xl p-6">
             <div className="flex items-center gap-3">
               <RotateCw className="h-5 w-5 text-primary"/>
-              <h3 className="text-lg font-semibold">Rotate Page</h3>
+              <h3 className="text-lg font-semibold">Rotate Pages</h3>
             </div>
             <input type="file" accept="application/pdf" className="mt-4 w-full rounded-lg border border-border/60 bg-background/60 p-2 text-sm" onChange={(event) => {
             const file = event.target.files?.[0] || null;
@@ -214,7 +254,7 @@ export default function PdfToolsPage() {
             recordRecent(file, "rotate");
         }}/>
             <div className="mt-3 grid grid-cols-2 gap-3">
-              <input type="number" min={1} value={rotatePage} onChange={(event) => setRotatePage(Number(event.target.value))} className="w-full rounded-lg border border-border/60 bg-background/60 p-2 text-sm" placeholder="Page"/>
+              <input type="text" value={rotatePages} onChange={(event) => setRotatePages(event.target.value)} className="w-full rounded-lg border border-border/60 bg-background/60 p-2 text-sm" placeholder="Pages e.g. 1,3,5-8"/>
               <input type="number" min={0} step={90} value={rotateDegrees} onChange={(event) => setRotateDegrees(Number(event.target.value))} className="w-full rounded-lg border border-border/60 bg-background/60 p-2 text-sm" placeholder="Degrees"/>
             </div>
             <button className="mt-4 w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" onClick={handleRotate}>
@@ -232,7 +272,7 @@ export default function PdfToolsPage() {
             setDeleteFile(file);
             recordRecent(file, "delete");
         }}/>
-            <input type="text" value={deletePages} onChange={(event) => setDeletePages(event.target.value)} className="mt-3 w-full rounded-lg border border-border/60 bg-background/60 p-2 text-sm" placeholder="1,3,5"/>
+            <input type="text" value={deletePages} onChange={(event) => setDeletePages(event.target.value)} className="mt-3 w-full rounded-lg border border-border/60 bg-background/60 p-2 text-sm" placeholder="Pages e.g. 1,3,5-8"/>
             <button className="mt-4 w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" onClick={handleDelete}>
               Delete & Download
             </button>
@@ -254,11 +294,23 @@ export default function PdfToolsPage() {
               <label className="text-xs text-muted-foreground">Quality</label>
               <input type="range" min={0.4} max={1} step={0.1} value={compressQuality} onChange={(event) => setCompressQuality(Number(event.target.value))}/>
             </div>
-            <button className="mt-4 w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" onClick={() => compressPdf({
-            file: compressFile,
-            scale: compressScale,
-            quality: compressQuality,
-        })}>
+            <button className="mt-4 w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" onClick={async () => {
+            if (!compressFile) {
+                toast({ title: "Select a PDF", description: "Choose a PDF before compressing.", variant: "destructive" });
+                return;
+            }
+            try {
+                await compressPdf({
+                    file: compressFile,
+                    scale: compressScale,
+                    quality: compressQuality,
+                });
+                toast({ title: "PDF compressed", description: "compressed.pdf download started." });
+            }
+            catch {
+                toast({ title: "Compression failed", description: "Could not compress this PDF.", variant: "destructive" });
+            }
+        }}>
               Compress & Download
             </button>
           </section>
@@ -276,7 +328,19 @@ export default function PdfToolsPage() {
             setReorderFile(file);
             recordRecent(file, "reorder");
         }}/>
-              <button className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" onClick={() => reorderPdf({ file: reorderFile, order: reorderPages })}>
+              <button className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" onClick={async () => {
+            if (!reorderFile || reorderPages.length === 0) {
+                toast({ title: "Select a PDF", description: "Upload a PDF before exporting reordered pages.", variant: "destructive" });
+                return;
+            }
+            try {
+                await reorderPdf({ file: reorderFile, order: reorderPages });
+                toast({ title: "PDF reordered", description: "reordered.pdf download started." });
+            }
+            catch {
+                toast({ title: "Reorder failed", description: "Could not export this PDF.", variant: "destructive" });
+            }
+        }}>
                 Export reordered PDF
               </button>
             </div>
@@ -332,15 +396,27 @@ export default function PdfToolsPage() {
             <div className="space-y-3 text-sm text-muted-foreground">
               <p>Apply quick annotations to the selected page.</p>
               <div className="grid gap-2">
-                <button className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" onClick={() => annotatePdf({
-            file: annotateFile,
-            pageNumber: annotatePage,
-            text: annotateText,
-            watermark: watermarkText,
-            highlightColor,
-            signatureFile,
-            drawCanvas: drawCanvasRef.current,
-        })}>
+                <button className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" onClick={async () => {
+            if (!annotateFile) {
+                toast({ title: "Select a PDF", description: "Choose a PDF before adding annotations.", variant: "destructive" });
+                return;
+            }
+            try {
+                await annotatePdf({
+                    file: annotateFile,
+                    pageNumber: annotatePage,
+                    text: annotateText,
+                    watermark: watermarkText,
+                    highlightColor,
+                    signatureFile,
+                    drawCanvas: drawCanvasRef.current,
+                });
+                toast({ title: "Annotations applied", description: "annotated.pdf download started." });
+            }
+            catch {
+                toast({ title: "Annotation failed", description: "Check the page number and try again.", variant: "destructive" });
+            }
+        }}>
                   Apply annotations & Download
                 </button>
                 <p className="text-xs">

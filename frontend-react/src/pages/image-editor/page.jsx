@@ -1,4 +1,8 @@
 import ImageEditorClientPage from "./client-page";
+import { AppShell } from "@/components/layout/app-shell";
+
 export default function ImageEditorPage() {
-    return <ImageEditorClientPage />;
+    return (<AppShell>
+      <ImageEditorClientPage />
+    </AppShell>);
 }

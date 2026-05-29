@@ -5,6 +5,7 @@ export function Canvas({ image, state, canvasRef, stageRef, layers, activeLayerI
     const containerRef = useRef(null);
     const [cropStart, setCropStart] = useState(null);
     const [currentCrop, setCurrentCrop] = useState(null);
+    const [cropInteraction, setCropInteraction] = useState(null);
     const [scale, setScale] = useState(1);
     const transformerRef = useRef(null);
     const selectedLayer = useMemo(() => layers.find((layer) => layer.id === activeLayerId) || null, [layers, activeLayerId]);
@@ -87,39 +88,124 @@ export function Canvas({ image, state, canvasRef, stageRef, layers, activeLayerI
             transformer.getLayer()?.batchDraw();
         }
     }, [selectedLayer, stageRef]);
+    const clampCrop = useCallback((crop) => {
+        const canvas = canvasRef.current;
+        if (!canvas)
+            return crop;
+        const minSize = 12;
+        const x = Math.max(0, Math.min(crop.x, canvas.width - minSize));
+        const y = Math.max(0, Math.min(crop.y, canvas.height - minSize));
+        const width = Math.max(minSize, Math.min(crop.width, canvas.width - x));
+        const height = Math.max(minSize, Math.min(crop.height, canvas.height - y));
+        return { x, y, width, height };
+    }, [canvasRef]);
+    const getCanvasPoint = useCallback((event) => {
+        const canvas = canvasRef.current;
+        if (!canvas)
+            return null;
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: (event.clientX - rect.left) / scale,
+            y: (event.clientY - rect.top) / scale,
+        };
+    }, [canvasRef, scale]);
+    const buildResizedCrop = useCallback((startCrop, point, mode) => {
+        let left = startCrop.x;
+        let top = startCrop.y;
+        let right = startCrop.x + startCrop.width;
+        let bottom = startCrop.y + startCrop.height;
+        if (mode.includes("w"))
+            left = point.x;
+        if (mode.includes("e"))
+            right = point.x;
+        if (mode.includes("n"))
+            top = point.y;
+        if (mode.includes("s"))
+            bottom = point.y;
+        const x = Math.min(left, right);
+        const y = Math.min(top, bottom);
+        return clampCrop({
+            x,
+            y,
+            width: Math.abs(right - left),
+            height: Math.abs(bottom - top),
+        });
+    }, [clampCrop]);
+    useEffect(() => {
+        if (!cropInteraction)
+            return undefined;
+        const handleMove = (event) => {
+            const point = getCanvasPoint(event);
+            if (!point)
+                return;
+            if (cropInteraction.mode === "move") {
+                const dx = point.x - cropInteraction.startPoint.x;
+                const dy = point.y - cropInteraction.startPoint.y;
+                onCropAreaChange(clampCrop({
+                    ...cropInteraction.startCrop,
+                    x: cropInteraction.startCrop.x + dx,
+                    y: cropInteraction.startCrop.y + dy,
+                }));
+                return;
+            }
+            onCropAreaChange(buildResizedCrop(cropInteraction.startCrop, point, cropInteraction.mode));
+        };
+        const handleEnd = () => setCropInteraction(null);
+        window.addEventListener("mousemove", handleMove);
+        window.addEventListener("mouseup", handleEnd);
+        return () => {
+            window.removeEventListener("mousemove", handleMove);
+            window.removeEventListener("mouseup", handleEnd);
+        };
+    }, [buildResizedCrop, clampCrop, cropInteraction, getCanvasPoint, onCropAreaChange]);
+    const startCropInteraction = useCallback((event, mode) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!state.cropArea)
+            return;
+        const point = getCanvasPoint(event);
+        if (!point)
+            return;
+        setCropInteraction({
+            mode,
+            startPoint: point,
+            startCrop: state.cropArea,
+        });
+    }, [getCanvasPoint, state.cropArea]);
     const handleMouseDown = useCallback((e) => {
         if (!isCropping)
             return;
-        const canvas = canvasRef.current;
-        if (!canvas)
+        if (cropInteraction)
             return;
-        const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX - rect.left) / scale;
-        const y = (e.clientY - rect.top) / scale;
+        const point = getCanvasPoint(e);
+        if (!point)
+            return;
+        const { x, y } = point;
         setCropStart({ x, y });
+        onCropAreaChange(null);
         setCurrentCrop({ x, y, width: 0, height: 0 });
-    }, [isCropping, scale, canvasRef]);
+    }, [cropInteraction, getCanvasPoint, isCropping, onCropAreaChange]);
     const handleMouseMove = useCallback((e) => {
         if (!cropStart || !isCropping)
             return;
-        const canvas = canvasRef.current;
-        if (!canvas)
+        const point = getCanvasPoint(e);
+        if (!point)
             return;
-        const rect = canvas.getBoundingClientRect();
-        const currentX = (e.clientX - rect.left) / scale;
-        const currentY = (e.clientY - rect.top) / scale;
+        const currentX = point.x;
+        const currentY = point.y;
         const x = Math.min(cropStart.x, currentX);
         const y = Math.min(cropStart.y, currentY);
         const width = Math.abs(currentX - cropStart.x);
         const height = Math.abs(currentY - cropStart.y);
-        setCurrentCrop({ x, y, width, height });
-    }, [cropStart, isCropping, scale, canvasRef]);
+        setCurrentCrop(clampCrop({ x, y, width, height }));
+    }, [clampCrop, cropStart, getCanvasPoint, isCropping]);
     const handleMouseUp = useCallback(() => {
         if (currentCrop && currentCrop.width > 10 && currentCrop.height > 10) {
-            onCropAreaChange(currentCrop);
+            onCropAreaChange(clampCrop(currentCrop));
         }
         setCropStart(null);
-    }, [currentCrop, onCropAreaChange]);
+        setCurrentCrop(null);
+    }, [clampCrop, currentCrop, onCropAreaChange]);
     if (!image) {
         return (<div className="flex h-full items-center justify-center">
         <div className="text-center text-muted-foreground">
@@ -134,8 +220,10 @@ export function Canvas({ image, state, canvasRef, stageRef, layers, activeLayerI
     return (<div ref={containerRef} className="relative flex h-full items-center justify-center overflow-hidden p-5">
       <div className="relative" style={{ transform: `scale(${scale})` }}>
         <canvas ref={canvasRef} className={`max-w-full rounded-sm shadow-2xl ${isCropping ? "cursor-crosshair" : ""}`} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}/>
-        <div className="absolute inset-0">
+        <div className={`absolute inset-0 ${isCropping ? "pointer-events-none" : ""}`}>
           <Stage ref={stageRef} width={canvasRef.current?.width || state.width} height={canvasRef.current?.height || state.height} onMouseDown={(event) => {
+            if (isCropping)
+                return;
             if (event.target === event.target.getStage()) {
                 onSelectLayer(null);
             }
@@ -143,7 +231,7 @@ export function Canvas({ image, state, canvasRef, stageRef, layers, activeLayerI
             <Layer>
               {layers.map((layer) => {
             if (layer.type === "text" || layer.type === "sticker") {
-                return (<Text key={layer.id} id={layer.id} text={layer.text || ""} x={layer.x} y={layer.y} width={layer.width || 320} fontSize={layer.fontSize || 32} fontFamily={layer.fontFamily || "Space Grotesk"} fill={layer.fill || "#ffffff"} align={layer.align || "left"} opacity={layer.opacity ?? 1} draggable onClick={() => onSelectLayer(layer.id)} onTap={() => onSelectLayer(layer.id)} onDragEnd={(event) => onUpdateLayer(layer.id, {
+                return (<Text key={layer.id} id={layer.id} text={layer.text || ""} x={layer.x} y={layer.y} width={layer.width || 320} fontSize={layer.fontSize || 32} fontFamily={layer.fontFamily || "Space Grotesk"} fill={layer.fill || "#ffffff"} align={layer.align || "left"} opacity={layer.opacity ?? 1} rotation={layer.rotation || 0} draggable onClick={() => onSelectLayer(layer.id)} onTap={() => onSelectLayer(layer.id)} onDragEnd={(event) => onUpdateLayer(layer.id, {
                         x: event.target.x(),
                         y: event.target.y(),
                     })} onTransformEnd={(event) => {
@@ -162,7 +250,7 @@ export function Canvas({ image, state, canvasRef, stageRef, layers, activeLayerI
                     }}/>);
             }
             if (layer.type === "rect") {
-                return (<Rect key={layer.id} id={layer.id} x={layer.x} y={layer.y} width={layer.width || 200} height={layer.height || 120} fill={layer.fill || "#22d3ee"} opacity={layer.opacity ?? 1} cornerRadius={14} draggable onClick={() => onSelectLayer(layer.id)} onTap={() => onSelectLayer(layer.id)} onDragEnd={(event) => onUpdateLayer(layer.id, {
+                return (<Rect key={layer.id} id={layer.id} x={layer.x} y={layer.y} width={layer.width || 200} height={layer.height || 120} fill={layer.fill || "#22d3ee"} opacity={layer.opacity ?? 1} rotation={layer.rotation || 0} cornerRadius={14} draggable onClick={() => onSelectLayer(layer.id)} onTap={() => onSelectLayer(layer.id)} onDragEnd={(event) => onUpdateLayer(layer.id, {
                         x: event.target.x(),
                         y: event.target.y(),
                     })} onTransformEnd={(event) => {
@@ -180,7 +268,7 @@ export function Canvas({ image, state, canvasRef, stageRef, layers, activeLayerI
                         });
                     }}/>);
             }
-            return (<Circle key={layer.id} id={layer.id} x={layer.x} y={layer.y} radius={layer.radius || 80} fill={layer.fill || "#34d399"} opacity={layer.opacity ?? 1} draggable onClick={() => onSelectLayer(layer.id)} onTap={() => onSelectLayer(layer.id)} onDragEnd={(event) => onUpdateLayer(layer.id, {
+            return (<Circle key={layer.id} id={layer.id} x={layer.x} y={layer.y} radius={layer.radius || 80} fill={layer.fill || "#34d399"} opacity={layer.opacity ?? 1} rotation={layer.rotation || 0} draggable onClick={() => onSelectLayer(layer.id)} onTap={() => onSelectLayer(layer.id)} onDragEnd={(event) => onUpdateLayer(layer.id, {
                     x: event.target.x(),
                     y: event.target.y(),
                 })} onTransformEnd={(event) => {
@@ -200,22 +288,29 @@ export function Canvas({ image, state, canvasRef, stageRef, layers, activeLayerI
             </Layer>
           </Stage>
         </div>
-        {isCropping && currentCrop && currentCrop.width > 0 && (<div className="absolute border-2 border-dashed border-primary bg-primary/20" style={{
+        {isCropping && currentCrop && currentCrop.width > 0 && (<div className="pointer-events-none absolute border-2 border-dashed border-primary bg-primary/20" style={{
                 left: currentCrop.x,
                 top: currentCrop.y,
                 width: currentCrop.width,
                 height: currentCrop.height,
             }}/>)}
-        {state.cropArea && (<div className="absolute border-2 border-primary bg-primary/10" style={{
+        {isCropping && state.cropArea && (<div className="absolute border-2 border-primary bg-primary/10" onMouseDown={(event) => startCropInteraction(event, "move")} style={{
                 left: state.cropArea.x,
                 top: state.cropArea.y,
                 width: state.cropArea.width,
                 height: state.cropArea.height,
+                cursor: "move",
             }}>
-            <div className="absolute -left-1 -top-1 h-3 w-3 rounded-full bg-primary"/>
-            <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-primary"/>
-            <div className="absolute -bottom-1 -left-1 h-3 w-3 rounded-full bg-primary"/>
-            <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-primary"/>
+            {[
+                    ["nw", "-left-1.5 -top-1.5", "nwse-resize"],
+                    ["n", "left-1/2 -top-1.5 -translate-x-1/2", "ns-resize"],
+                    ["ne", "-right-1.5 -top-1.5", "nesw-resize"],
+                    ["e", "-right-1.5 top-1/2 -translate-y-1/2", "ew-resize"],
+                    ["se", "-bottom-1.5 -right-1.5", "nwse-resize"],
+                    ["s", "-bottom-1.5 left-1/2 -translate-x-1/2", "ns-resize"],
+                    ["sw", "-bottom-1.5 -left-1.5", "nesw-resize"],
+                    ["w", "-left-1.5 top-1/2 -translate-y-1/2", "ew-resize"],
+                ].map(([mode, position, cursor]) => (<button key={mode} type="button" aria-label={`Resize crop ${mode}`} className={`absolute h-4 w-4 rounded-full border-2 border-background bg-primary shadow ${position}`} style={{ cursor }} onMouseDown={(event) => startCropInteraction(event, mode)}/>))}
           </div>)}
       </div>
     </div>);

@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { RotateCcw, RotateCw, FlipHorizontal, FlipVertical, Check, X, Link2, Link2Off, Trash2, ArrowUp, ArrowDown, AlignLeft, AlignCenter, AlignRight, Type, Shapes, Sticker, } from "lucide-react";
+import { RotateCcw, RotateCw, FlipHorizontal, FlipVertical, Check, X, Link2, Link2Off, Trash2, ArrowUp, ArrowDown, AlignLeft, AlignCenter, AlignRight, Type, Shapes, Sticker, Copy, } from "lucide-react";
 const filters = [
     { id: "none", label: "None", preview: "bg-gradient-to-br from-slate-400 to-slate-600" },
     { id: "grayscale", label: "Grayscale", preview: "bg-gradient-to-br from-gray-400 to-gray-600 grayscale" },
@@ -24,20 +24,32 @@ const fontOptions = [
     "Roboto",
     "Playfair Display",
 ];
-export function SidePanel({ activeTool, state, layers, presets, activeLayerId, onAddLayer, onUpdateLayer, onRemoveLayer, onMoveLayer, onSelectLayer, onStateChange, onRotate, onFlip, onApplyCrop, onCancelCrop, onResize, onApplyPreset, onApplyChanges, onReset, }) {
+export function SidePanel({ activeTool, state, layers, presets, activeLayerId, onAddLayer, onUpdateLayer, onRemoveLayer, onDuplicateLayer, onMoveLayer, onSelectLayer, onStateChange, onRotate, onFlip, onApplyCrop, onCancelCrop, onResize, onApplyPreset, onApplyChanges, onReset, }) {
     const [resizeWidth, setResizeWidth] = useState(state.width);
     const [resizeHeight, setResizeHeight] = useState(state.height);
     const [maintainAspectRatio, setMaintainAspectRatio] = useState(true);
     const [textValue, setTextValue] = useState("EditFusion");
     const [textSize, setTextSize] = useState(42);
     const [textColor, setTextColor] = useState("#ffffff");
+    const [textFont, setTextFont] = useState("Space Grotesk");
+    const [textAlign, setTextAlign] = useState("left");
     const [shapeColor, setShapeColor] = useState("#22d3ee");
     const aspectRatio = state.width / state.height;
     const activeLayer = layers.find((layer) => layer.id === activeLayerId) || null;
+    const activeTextLayer = activeLayer?.type === "text" ? activeLayer : null;
     useEffect(() => {
         setResizeWidth(state.width);
         setResizeHeight(state.height);
     }, [state.width, state.height]);
+    useEffect(() => {
+        if (!activeTextLayer)
+            return;
+        setTextValue(activeTextLayer.text || "");
+        setTextSize(activeTextLayer.fontSize || 42);
+        setTextColor(activeTextLayer.fill || "#ffffff");
+        setTextFont(activeTextLayer.fontFamily || "Space Grotesk");
+        setTextAlign(activeTextLayer.align || "left");
+    }, [activeTextLayer]);
     const handleWidthChange = (value) => {
         const width = parseInt(value) || 0;
         setResizeWidth(width);
@@ -51,6 +63,29 @@ export function SidePanel({ activeTool, state, layers, presets, activeLayerId, o
         if (maintainAspectRatio && height > 0) {
             setResizeWidth(Math.round(height * aspectRatio));
         }
+    };
+    const handleAddTextLayer = () => {
+        const text = textValue.trim() || "New text";
+        const id = crypto.randomUUID();
+        onAddLayer({
+            id,
+            type: "text",
+            x: Math.max(40, Math.round(state.width * 0.12)),
+            y: Math.max(40, Math.round(state.height * 0.12)),
+            width: Math.min(420, Math.max(180, Math.round(state.width * 0.55))),
+            text,
+            fontSize: textSize,
+            fontFamily: textFont,
+            fill: textColor,
+            opacity: 1,
+            align: textAlign,
+        });
+        onSelectLayer(id);
+    };
+    const handleUpdateActiveText = (updates) => {
+        if (!activeTextLayer)
+            return;
+        onUpdateLayer(activeTextLayer.id, updates);
     };
     const renderContent = () => {
         switch (activeTool) {
@@ -203,33 +238,75 @@ export function SidePanel({ activeTool, state, layers, presets, activeLayerId, o
                 return (<div className="space-y-4">
             <div className="flex items-center gap-2">
               <Type className="h-4 w-4 text-primary"/>
-              <h3 className="font-semibold text-foreground">Add Text</h3>
+              <h3 className="font-semibold text-foreground">{activeTextLayer ? "Edit Text" : "Add Text"}</h3>
             </div>
-            <Input value={textValue} onChange={(e) => setTextValue(e.target.value)} placeholder="Type something"/>
+            <Input value={textValue} onChange={(e) => {
+                        setTextValue(e.target.value);
+                        handleUpdateActiveText({ text: e.target.value });
+                    }} placeholder="Type something"/>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Size</Label>
-                <Input type="number" min={12} value={textSize} onChange={(e) => setTextSize(Number(e.target.value))}/>
+                <Input type="number" min={12} value={textSize} onChange={(e) => {
+                        const size = Number(e.target.value);
+                        setTextSize(size);
+                        handleUpdateActiveText({ fontSize: size });
+                    }}/>
               </div>
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Color</Label>
-                <Input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)}/>
+                <Input type="color" value={textColor} onChange={(e) => {
+                        setTextColor(e.target.value);
+                        handleUpdateActiveText({ fill: e.target.value });
+                    }}/>
               </div>
             </div>
-            <Button onClick={() => onAddLayer({
-                        id: crypto.randomUUID(),
-                        type: "text",
-                        x: 80,
-                        y: 80,
-                        text: textValue,
-                        fontSize: textSize,
-                        fontFamily: "Space Grotesk",
-                        fill: textColor,
-                        opacity: 1,
-                        align: "left",
-                    })}>
-              Add Text Layer
-            </Button>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Font</Label>
+              <select value={textFont} onChange={(event) => {
+                        setTextFont(event.target.value);
+                        handleUpdateActiveText({ fontFamily: event.target.value });
+                    }} className="w-full rounded-lg border border-border/60 bg-background/60 p-2 text-sm">
+                {fontOptions.map((font) => (<option key={font} value={font}>
+                    {font}
+                  </option>))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Alignment</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <Button variant={textAlign === "left" ? "secondary" : "outline"} size="icon" onClick={() => {
+                        setTextAlign("left");
+                        handleUpdateActiveText({ align: "left" });
+                    }}>
+                  <AlignLeft className="h-4 w-4"/>
+                </Button>
+                <Button variant={textAlign === "center" ? "secondary" : "outline"} size="icon" onClick={() => {
+                        setTextAlign("center");
+                        handleUpdateActiveText({ align: "center" });
+                    }}>
+                  <AlignCenter className="h-4 w-4"/>
+                </Button>
+                <Button variant={textAlign === "right" ? "secondary" : "outline"} size="icon" onClick={() => {
+                        setTextAlign("right");
+                        handleUpdateActiveText({ align: "right" });
+                    }}>
+                  <AlignRight className="h-4 w-4"/>
+                </Button>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Button onClick={handleAddTextLayer}>
+                Add New Text
+              </Button>
+              {activeTextLayer && (<Button variant="outline" className="text-destructive hover:text-destructive" onClick={() => onRemoveLayer(activeTextLayer.id)}>
+                  <Trash2 className="mr-2 h-4 w-4"/>
+                  Delete Selected Text
+                </Button>)}
+            </div>
+            {activeTextLayer && (<p className="text-xs text-muted-foreground">
+                Drag the selected text on the image. Use the handles to resize or rotate it.
+              </p>)}
           </div>);
             case "shape":
                 return (<div className="space-y-4">
@@ -301,14 +378,17 @@ export function SidePanel({ activeTool, state, layers, presets, activeLayerId, o
                       <button onClick={() => onSelectLayer(layer.id)} className="flex-1 text-left">
                         {layer.type.toUpperCase()} · {layer.id.slice(0, 4)}
                       </button>
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => onMoveLayer(layer.id, "up")} className="rounded border border-border/60 p-1">
+                      <div className="flex items-center gap-1">
+                        <button title="Move up" onClick={() => onMoveLayer(layer.id, "up")} className="rounded border border-border/60 p-1">
                           <ArrowUp className="h-3 w-3"/>
                         </button>
-                        <button onClick={() => onMoveLayer(layer.id, "down")} className="rounded border border-border/60 p-1">
+                        <button title="Move down" onClick={() => onMoveLayer(layer.id, "down")} className="rounded border border-border/60 p-1">
                           <ArrowDown className="h-3 w-3"/>
                         </button>
-                        <button onClick={() => onRemoveLayer(layer.id)} className="rounded border border-border/60 p-1 text-destructive">
+                        <button title="Duplicate" onClick={() => onDuplicateLayer(layer.id)} className="rounded border border-border/60 p-1">
+                          <Copy className="h-3 w-3"/>
+                        </button>
+                        <button title="Delete" onClick={() => onRemoveLayer(layer.id)} className="rounded border border-border/60 p-1 text-destructive">
                           <Trash2 className="h-3 w-3"/>
                         </button>
                       </div>
@@ -318,6 +398,20 @@ export function SidePanel({ activeTool, state, layers, presets, activeLayerId, o
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>Layer Properties</span>
                   <span>{activeLayer.type.toUpperCase()}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">X</Label>
+                    <Input type="number" value={Math.round(activeLayer.x || 0)} onChange={(event) => onUpdateLayer(activeLayer.id, { x: Number(event.target.value) })}/>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Y</Label>
+                    <Input type="number" value={Math.round(activeLayer.y || 0)} onChange={(event) => onUpdateLayer(activeLayer.id, { y: Number(event.target.value) })}/>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Rotation</Label>
+                  <Input type="number" value={Math.round(activeLayer.rotation || 0)} onChange={(event) => onUpdateLayer(activeLayer.id, { rotation: Number(event.target.value) })}/>
                 </div>
                 {(activeLayer.type === "text" || activeLayer.type === "sticker") && (<div className="space-y-3">
                     <Input value={activeLayer.text || ""} onChange={(event) => onUpdateLayer(activeLayer.id, { text: event.target.value })} placeholder="Layer text"/>
@@ -367,6 +461,16 @@ export function SidePanel({ activeTool, state, layers, presets, activeLayerId, o
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">Opacity</Label>
                   <Slider value={[Math.round((activeLayer.opacity ?? 1) * 100)]} onValueChange={([value]) => onUpdateLayer(activeLayer.id, { opacity: value / 100 })} min={10} max={100} step={1}/>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" onClick={() => onDuplicateLayer(activeLayer.id)}>
+                    <Copy className="mr-2 h-4 w-4"/>
+                    Duplicate
+                  </Button>
+                  <Button variant="outline" className="text-destructive hover:text-destructive" onClick={() => onRemoveLayer(activeLayer.id)}>
+                    <Trash2 className="mr-2 h-4 w-4"/>
+                    Delete
+                  </Button>
                 </div>
               </div>)}
           </div>);

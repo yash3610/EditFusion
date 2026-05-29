@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { API_URL } from "@/lib/api";
 import { ArrowDownToLine, Repeat } from "lucide-react";
 import { addDownloadHistory, addRecentFile } from "@/lib/history";
+import { useToast } from "@/hooks/use-toast";
 const downloadDataUrl = (dataUrl, filename) => {
     const link = document.createElement("a");
     link.href = dataUrl;
@@ -11,6 +12,7 @@ const downloadDataUrl = (dataUrl, filename) => {
     link.click();
 };
 export default function ConverterPage() {
+    const { toast } = useToast();
     const [file, setFile] = useState(null);
     const [format, setFormat] = useState("png");
     const [docFile, setDocFile] = useState(null);
@@ -20,11 +22,15 @@ export default function ConverterPage() {
     const [batchFiles, setBatchFiles] = useState([]);
     const [batchTarget, setBatchTarget] = useState("pdf");
     const handleConvert = async () => {
-        if (!file)
+        if (!file) {
+            toast({ title: "Select an image", description: "Choose an image before converting.", variant: "destructive" });
             return;
+        }
         const output = await convertImage(file, format);
-        if (!output)
+        if (!output) {
+            toast({ title: "Conversion failed", description: "Could not read this image.", variant: "destructive" });
             return;
+        }
         downloadDataUrl(output, `converted.${format}`);
         addDownloadHistory({
             id: `${Date.now()}-${format}`,
@@ -33,91 +39,116 @@ export default function ConverterPage() {
             time: new Date().toISOString(),
             source: "converter",
         });
+        toast({ title: "Image converted", description: `converted.${format} download started.` });
     };
     const handleDocConvert = async () => {
-        if (!docFile)
+        if (!docFile) {
+            toast({ title: "Select a document", description: "Choose a DOCX, PPTX, or XLSX file.", variant: "destructive" });
             return;
-        const formData = new FormData();
-        formData.append("file", docFile);
-        const token = localStorage.getItem("ef_token");
-        const response = await fetch(`${API_URL}/api/convert/${docType}`, {
-            method: "POST",
-            body: formData,
-            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
-        if (!response.ok)
-            return;
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `${docFile.name.replace(/\.[^.]+$/, "")}.pdf`;
-        link.click();
-        URL.revokeObjectURL(url);
-        addDownloadHistory({
-            id: `${Date.now()}-${docType}`,
-            name: `${docFile.name.replace(/\.[^.]+$/, "")}.pdf`,
-            type: "pdf",
-            time: new Date().toISOString(),
-            source: "converter",
-        });
+        }
+        try {
+            const formData = new FormData();
+            formData.append("file", docFile);
+            const token = localStorage.getItem("ef_token");
+            const response = await fetch(`${API_URL}/api/convert/${docType}`, {
+                method: "POST",
+                body: formData,
+                headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            });
+            if (!response.ok)
+                throw new Error("Request failed");
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${docFile.name.replace(/\.[^.]+$/, "")}.pdf`;
+            link.click();
+            URL.revokeObjectURL(url);
+            addDownloadHistory({
+                id: `${Date.now()}-${docType}`,
+                name: `${docFile.name.replace(/\.[^.]+$/, "")}.pdf`,
+                type: "pdf",
+                time: new Date().toISOString(),
+                source: "converter",
+            });
+            toast({ title: "Document converted", description: `${link.download} download started.` });
+        }
+        catch {
+            toast({ title: "Conversion failed", description: "Server conversion is not available right now.", variant: "destructive" });
+        }
     };
     const handlePdfConvert = async () => {
-        if (!pdfFile)
+        if (!pdfFile) {
+            toast({ title: "Select a PDF", description: "Choose a PDF before converting.", variant: "destructive" });
             return;
-        const formData = new FormData();
-        formData.append("file", pdfFile);
-        const token = localStorage.getItem("ef_token");
-        const response = await fetch(`${API_URL}/api/convert/pdf-to/${pdfTarget}`, {
-            method: "POST",
-            body: formData,
-            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
-        if (!response.ok)
-            return;
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `${pdfFile.name.replace(/\.[^.]+$/, "")}.${pdfTarget}`;
-        link.click();
-        URL.revokeObjectURL(url);
-        addDownloadHistory({
-            id: `${Date.now()}-${pdfTarget}`,
-            name: `${pdfFile.name.replace(/\.[^.]+$/, "")}.${pdfTarget}`,
-            type: pdfTarget,
-            time: new Date().toISOString(),
-            source: "converter",
-        });
+        }
+        try {
+            const formData = new FormData();
+            formData.append("file", pdfFile);
+            const token = localStorage.getItem("ef_token");
+            const response = await fetch(`${API_URL}/api/convert/pdf-to/${pdfTarget}`, {
+                method: "POST",
+                body: formData,
+                headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            });
+            if (!response.ok)
+                throw new Error("Request failed");
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${pdfFile.name.replace(/\.[^.]+$/, "")}.${pdfTarget}`;
+            link.click();
+            URL.revokeObjectURL(url);
+            addDownloadHistory({
+                id: `${Date.now()}-${pdfTarget}`,
+                name: `${pdfFile.name.replace(/\.[^.]+$/, "")}.${pdfTarget}`,
+                type: pdfTarget,
+                time: new Date().toISOString(),
+                source: "converter",
+            });
+            toast({ title: "PDF converted", description: `${link.download} download started.` });
+        }
+        catch {
+            toast({ title: "Conversion failed", description: "Server conversion is not available right now.", variant: "destructive" });
+        }
     };
     const handleBatchConvert = async () => {
-        if (batchFiles.length === 0)
+        if (batchFiles.length === 0) {
+            toast({ title: "Select files", description: "Choose files before batch conversion.", variant: "destructive" });
             return;
-        const formData = new FormData();
-        batchFiles.forEach((fileItem) => formData.append("files", fileItem));
-        formData.append("target", batchTarget);
-        const token = localStorage.getItem("ef_token");
-        const response = await fetch(`${API_URL}/api/convert/batch`, {
-            method: "POST",
-            body: formData,
-            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
-        if (!response.ok)
-            return;
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = "converted.zip";
-        link.click();
-        URL.revokeObjectURL(url);
-        addDownloadHistory({
-            id: `${Date.now()}-batch-${batchTarget}`,
-            name: "converted.zip",
-            type: "zip",
-            time: new Date().toISOString(),
-            source: "converter",
-        });
+        }
+        try {
+            const formData = new FormData();
+            batchFiles.forEach((fileItem) => formData.append("files", fileItem));
+            formData.append("target", batchTarget);
+            const token = localStorage.getItem("ef_token");
+            const response = await fetch(`${API_URL}/api/convert/batch`, {
+                method: "POST",
+                body: formData,
+                headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            });
+            if (!response.ok)
+                throw new Error("Request failed");
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "converted.zip";
+            link.click();
+            URL.revokeObjectURL(url);
+            addDownloadHistory({
+                id: `${Date.now()}-batch-${batchTarget}`,
+                name: "converted.zip",
+                type: "zip",
+                time: new Date().toISOString(),
+                source: "converter",
+            });
+            toast({ title: "Batch converted", description: "converted.zip download started." });
+        }
+        catch {
+            toast({ title: "Batch failed", description: "Server conversion is not available right now.", variant: "destructive" });
+        }
     };
     return (<AppShell>
       <div className="grid gap-8">
